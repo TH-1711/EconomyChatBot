@@ -49,7 +49,10 @@ const StatisticsPage: React.FC = () => {
       const sheet = workbook.Sheets[sheetName];
 
       // Chuyển dữ liệu từ Excel sang JSON
-      const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json<ExcelRow>(sheet);
+      const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
+        raw: false,
+        defval: "",
+      });
       console.log("Raw Excel Data:", jsonData); // Kiểm tra dữ liệu gốc
 
       // Xử lý dữ liệu cho biểu đồ
@@ -87,6 +90,7 @@ const StatisticsPage: React.FC = () => {
   /** Chuyển Excel Serial Number hoặc text date thành chuỗi yyyy-mm-dd */
   const convertExcelDate = (value: string | number): string => {
     if (typeof value === "number") {
+      console.log(value, " + ", typeof value);
       // Xử lý Excel Serial Number (ngày Excel)
       const excelStartDate = new Date(1900, 0, 0);
       const convertedDate = new Date(
@@ -97,11 +101,13 @@ const StatisticsPage: React.FC = () => {
 
     if (typeof value === "string") {
       // Xử lý ngày dưới dạng chuỗi "dd/mm/yyyy"
+      console.log(value, " + ", typeof value);
       const [day, month, year] = value.split("/").map(Number);
+      console.log(day, "/", month, "/", year);
       if (!day || !month || !year) return "";
-      return `${year}-${month.toString().padStart(2, "0")}-${day
+      return `${day.toString().padStart(2, "0")}/${month
         .toString()
-        .padStart(2, "0")}`;
+        .padStart(2, "0")}/${year}`;
     }
 
     return "";
