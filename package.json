@@ -1,0 +1,63 @@
+{
+  "name": "ChatBot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "build": "electron-builder",
+    "dev": "electron . --enable-logging --no-sandbox",
+    "package": "electron-builder --dir",
+    "dist": "electron-builder --win --x64",
+    "dist:all": "electron-builder --win --x64 --mac --linux",
+    "dist:mac": "electron-builder --mac --x64",
+    "dist:linux": "electron-builder --linux --x64",
+    "dist:win": "electron-builder --win --x64",
+    "dist:win:all": "electron-builder --win --x64 --ia32"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.7.1",
+  "devDependencies": {
+    "electron": "^35.1.4",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "@nestjs/cli": "^11.0.6"
+  },
+  "build": {
+    "appId": "EconomyChatBot",
+    "productName": "ECB",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "FE/dist/**/*",
+      "main.js",
+      "package.json",
+      "be/dist/**/*",
+      "be/.env"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "asar": true
+  }
+}

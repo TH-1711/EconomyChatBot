@@ -1,5 +1,5 @@
 import React from "react";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
 import MainLayout from "../layout/mainLayout";
 import ChatPage from "../pages/chatPage";
 import HistoryPage from "../pages/historyPage";
@@ -43,7 +43,7 @@ const routes = [
   },
 ];
 
-const router = createBrowserRouter(routes);
+const router = createHashRouter(routes);
 
 const Router: React.FC = () => {
   return <RouterProvider router={router} />;

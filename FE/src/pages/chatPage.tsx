@@ -15,19 +15,51 @@ const ChatPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (input.trim()) {
+      const userMessage = input.trim();
       // Add user's message
       setMessages((prev) => [...prev, { sender: "user", text: input }]);
       setInput("");
 
       // Simulate bot response after 1s delay
-      setTimeout(() => {
+      try {
+        console.log("Sending message to API:", userMessage);
+        // Gọi API GET với query parameter chứa message của người dùng
+        const response = await fetch(`http://localhost:3000/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: userMessage }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        const botResponse = await response.json();
+        console.log("Bot response:", botResponse);
+        // botResponse có định dạng:
+        // {
+        //   status: "success",
+        //   message: responseText,
+        //   botMessage: cmd,
+        //   type: type, 
+        //   data: transaction,
+        // }
+        // Lấy trường botMessage làm phản hồi của chatbot đến người dùng
+        const botMessage = botResponse.message;
         setMessages((prev) => [
           ...prev,
-          { sender: "bot", text: "This is an automated response." },
+          { sender: "bot", text: botMessage },
         ]);
-      }, 1000);
+      } catch (error) {
+        console.error("Error fetching bot response:", error);
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "Có lỗi xảy ra. Vui lòng thử lại sau." },
+        ]);
+      }
     }
   };
 

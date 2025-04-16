@@ -13,15 +13,14 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// Định nghĩa kiểu dữ liệu từ file Excel
+// Kiểu dữ liệu đầu vào từ Excel
 interface ExcelRow {
-  InputTime: string | number;
-  Time: string | number;
-  Amount: string | number;
-  Balance: string | number;
+  "Thời gian ghi nhận": string | number;
+  "Thời gian giao dịch": string | number;
+  "Số tiền": string | number;
 }
 
-// Định nghĩa kiểu dữ liệu hiển thị trên biểu đồ
+// Kiểu dữ liệu hiển thị cho biểu đồ
 interface ChartData {
   date: string;
   income: number;
@@ -31,9 +30,7 @@ interface ChartData {
 
 const StatisticsPage: React.FC = () => {
   const [data, setData] = useState<ChartData[]>([]);
-  const [selectedMetric, setSelectedMetric] = useState<
-    "income" | "used" | "balance" | "all"
-  >("all");
+  const [selectedMetric, setSelectedMetric] = useState<"income" | "used" | "balance" | "all">("all");
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -48,148 +45,120 @@ const StatisticsPage: React.FC = () => {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
 
-      // Chuyển dữ liệu từ Excel sang JSON
-      const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json<ExcelRow>(sheet, {
-        raw: false,
-        defval: "",
-      });
-      console.log("Raw Excel Data:", jsonData); // Kiểm tra dữ liệu gốc
+      // Chuyển sheet Excel thành JSON (defval để đảm bảo các ô trống được lấy thành chuỗi rỗng)
+      const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: "" });
+      console.log("Raw Excel Data:", jsonData);
 
-      // Xử lý dữ liệu cho biểu đồ
       const formattedData: ChartData[] = jsonData
         .map((row) => {
-          // Chuyển đổi InputTime (có thể là số serial hoặc text)
-          const dateStr = convertExcelDate(row.InputTime);
+          // Sử dụng "Thời gian giao dịch" để làm ngày hiển thị (bạn có thể đổi thành "Thời gian ghi nhận" nếu muốn)
+          const dateStr = convertExcelDate(row["Thời gian giao dịch"]);
           if (!dateStr) {
-            console.warn("Dữ liệu InputTime không hợp lệ:", row.InputTime);
-            return null; // Bỏ qua dòng bị lỗi
+            console.warn("Dữ liệu Thời gian giao dịch không hợp lệ:", row["Thời gian giao dịch"]);
+            return null;
           }
 
-          // Chuyển đổi Amount và Balance thành số hợp lệ
-          const amount = Number(row.Amount?.toString().replace(/,/g, "") || 0);
-          const balance = Number(
-            row.Balance?.toString().replace(/,/g, "") || 0
-          );
+          const amount = parseMoney(row["Số tiền"]);
 
           return {
             date: dateStr,
             income: amount > 0 ? amount : 0,
             used: amount < 0 ? Math.abs(amount) : 0,
-            balance: isNaN(balance) ? 0 : balance,
           };
         })
-        .filter((row): row is ChartData => row !== null) // Lọc bỏ các dòng null
-        .sort((a, b) => a.date.localeCompare(b.date)); // Sắp xếp theo ngày
+        .filter((row): row is ChartData => row !== null)
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-      console.log("Formatted Data:", formattedData); // Kiểm tra dữ liệu sau khi xử lý
+      console.log("Formatted Data:", formattedData);
       setData(formattedData);
     };
+
     reader.readAsBinaryString(file);
   };
 
-  /** Chuyển Excel Serial Number hoặc text date thành chuỗi yyyy-mm-dd */
+  /**
+   * Chuyển đổi giá trị (số serial hoặc chuỗi dd/mm/yyyy) thành chuỗi yyyy-mm-dd
+   */
   const convertExcelDate = (value: string | number): string => {
     if (typeof value === "number") {
-      console.log(value, " + ", typeof value);
-      // Xử lý Excel Serial Number (ngày Excel)
-      const excelStartDate = new Date(1900, 0, 0);
-      const convertedDate = new Date(
-        excelStartDate.getTime() + (value - 1) * 24 * 60 * 60 * 1000
-      );
-      return convertedDate.toISOString().split("T")[0]; // yyyy-mm-dd
+      // Excel thường tính từ ngày 1/1/1900 (lưu ý có bug về năm 1900)
+      const startDate = new Date(1900, 0, 0);
+      const converted = new Date(startDate.getTime() + (value - 1) * 86400000);
+      return converted.toISOString().split("T")[0]; // yyyy-mm-dd
     }
 
     if (typeof value === "string") {
-      // Xử lý ngày dưới dạng chuỗi "dd/mm/yyyy"
-      console.log(value, " + ", typeof value);
-      const [day, month, year] = value.split("/").map(Number);
-      console.log(day, "/", month, "/", year);
+      // Nếu đã có định dạng dd/mm/yyyy
+      const parts = value.split("/");
+      if (parts.length !== 3) return "";
+      const [day, month, year] = parts.map(Number);
       if (!day || !month || !year) return "";
-      return `${day.toString().padStart(2, "0")}/${month
-        .toString()
-        .padStart(2, "0")}/${year}`;
+      // Chuyển thành định dạng yyyy-mm-dd để dễ sắp xếp
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
-
     return "";
+  };
+
+  /**
+   * Chuyển đổi giá trị Amount về dạng số
+   */
+  const parseMoney = (value: string | number): number => {
+    if (typeof value === "string") {
+      // Loại bỏ dấu phẩy, dấu chấm nếu cần
+      return parseFloat(value.replace(/,/g, "").replace(/\./g, "")) || 0;
+    }
+    return Number(value) || 0;
   };
 
   return (
     <div style={{ padding: "20px", textAlign: "center" }}>
-      <h2>Thống kê tài chính</h2>
+      <h2>Biểu đồ thống kê tài chính</h2>
 
-      {/* File Upload */}
-      <input
-        type="file"
-        accept=".xlsx, .xls, .csv"
-        onChange={handleFileUpload}
-      />
+      {/* Tải file Excel */}
+      <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} />
 
-      {/* Bộ lọc dữ liệu */}
-      <div style={{ margin: "20px 0" }}>
+      {/* Bộ lọc */}
+      <div style={{ marginTop: "20px" }}>
         <label>
-          <input
-            type="radio"
-            name="metric"
-            value="income"
-            onChange={() => setSelectedMetric("income")}
-          />{" "}
-          Income
+          <input type="radio" name="metric" value="income" onChange={() => setSelectedMetric("income")} /> Thu nhập
         </label>
-        <label style={{ marginLeft: "10px" }}>
-          <input
-            type="radio"
-            name="metric"
-            value="used"
-            onChange={() => setSelectedMetric("used")}
-          />{" "}
-          Used
+        <label style={{ marginLeft: "15px" }}>
+          <input type="radio" name="metric" value="used" onChange={() => setSelectedMetric("used")} /> Chi tiêu
         </label>
-        <label style={{ marginLeft: "10px" }}>
-          <input
-            type="radio"
-            name="metric"
-            value="balance"
-            onChange={() => setSelectedMetric("balance")}
-          />{" "}
-          Balance
-        </label>
-        <label style={{ marginLeft: "10px" }}>
-          <input
-            type="radio"
-            name="metric"
-            value="all"
-            checked={selectedMetric === "all"}
-            onChange={() => setSelectedMetric("all")}
-          />{" "}
-          All
+        <label style={{ marginLeft: "15px" }}>
+          <input type="radio" name="metric" value="all" checked={selectedMetric === "all"} onChange={() => setSelectedMetric("all")} /> Tất cả
         </label>
       </div>
 
-      {/* Hiển thị biểu đồ */}
-      <div style={{ width: "80%", height: "400px", margin: "0 auto" }}>
+      {/* Biểu đồ */}
+      <div style={{ width: "90%", height: "400px", margin: "30px auto" }}>
         <ResponsiveContainer width="100%" height="100%">
           {selectedMetric === "all" ? (
-            // Biểu đồ kết hợp (Income + Used + Balance)
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={(value: number) => value.toLocaleString("vi-VN") + " VND"} />
               <Legend />
-              <Line type="monotone" dataKey="income" stroke="#4CAF50" />
-              <Line type="monotone" dataKey="used" stroke="#FF5722" />
-              <Line type="monotone" dataKey="balance" stroke="#2196F3" />
+              <Line type="monotone" dataKey="income" stroke="#4CAF50" name="Thu nhập" />
+              <Line type="monotone" dataKey="used" stroke="#FF5722" name="Chi tiêu" />
             </LineChart>
           ) : (
-            // Biểu đồ cột (Income, Used, hoặc Balance)
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={(value: number) => value.toLocaleString("vi-VN") + " VND"} />
               <Legend />
               <Bar
                 dataKey={selectedMetric}
+                name={
+                  selectedMetric === "income"
+                    ? "Thu nhập"
+                    : selectedMetric === "used"
+                    ? "Chi tiêu"
+                    : "Số dư"
+                }
                 fill={
                   selectedMetric === "income"
                     ? "#4CAF50"
